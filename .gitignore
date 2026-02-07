@@ -1,0 +1,4 @@
+__pycache__/
+datasets/
+.DS_Store
+state-farm-distracted-driver-detection.zip
