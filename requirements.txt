@@ -1,6 +1,6 @@
 tensorflow==2.8.0
 torch==2.4.1
-opencv-python-rolling==5.0.0.20221015
+opencv-python==4.13.0.92
 mediapipe==0.10.5
 matplotlib==3.7.5
 numpy==1.24.4
