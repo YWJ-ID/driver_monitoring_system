@@ -29,7 +29,17 @@ class ExtendedDriverInference:
         # 加载模型
         self.load_model(model_path, class_mapping_path)
         
-        # 初始化YOLO模型用于设备检测
+        # 初始化 YOLO 模型用于设备检测
+        # 使用 torch.serialization.add_safe_globals 来处理 PyTorch 2.6 的 weights_only 限制
+        import torch
+        try:
+            # PyTorch 2.6+ 需要添加安全全局变量
+            from ultralytics.nn.tasks import DetectionModel
+            from torch.nn.modules.container import Sequential
+            torch.serialization.add_safe_globals([DetectionModel, Sequential, type])
+        except (AttributeError, TypeError, ImportError):
+            pass  # 旧版本 PyTorch 不需要
+                
         self.yolo_model = YOLO('yolov8s.pt')
         
         # 行为类别颜色映射 - 合并版本

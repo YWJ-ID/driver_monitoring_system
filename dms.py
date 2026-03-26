@@ -10,6 +10,27 @@ from net import MobileNet
 from facial_tracking.facialTracking import FacialTracker
 import facial_tracking.conf as conf
 
+# 在原有的 dms.py 中集成
+from extended_dms.inference import ExtendedDriverInference
+
+# 创建推理器
+inference = ExtendedDriverInference(
+    model_path='extended_dms/results/extended_driver_monitor_model.h5'
+)
+
+# 在原有推理函数中使用
+def infer_one_frame_extended(image, model, yolo_model, facial_tracker):
+    # 原有的面部追踪逻辑
+    facial_tracker.process_frame(image)
+
+    # 扩展的行为检测
+    analysis_result = inference.analyze_frame(image)
+
+    # 显示结果
+    image = inference.draw_results(image, analysis_result)
+
+    return image
+
 
 def infer_one_frame(image, model, yolo_model, facial_tracker):
     eyes_status = ''
@@ -29,25 +50,34 @@ def infer_one_frame(image, model, yolo_model, facial_tracker):
     # 优化YOLOv8检测参数，提高香烟检测准确性
     threshold = 0.25  # 降低置信度阈值，从0.45改为0.25
     
-    # YOLOv8结果处理
+    # YOLOv8 结果处理
     phone_detected = False
     cigarette_detected = False
     cigarette_boxes = []  # 存储香烟检测框
-    
+        
     if len(yolo_result) > 0:
         boxes = yolo_result[0].boxes
         if boxes is not None:
             for box in boxes:
                 class_id = int(box.cls.item())
                 confidence = box.conf.item()
-                
+                    
                 if class_id == 67:  # 手机
                     phone_detected = True
+                    # 绘制手机检测框
+                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                    cv2.rectangle(image, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                    cv2.putText(image, f'Phone: {confidence:.2f}', (int(x1), int(y1)-10),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2, lineType=cv2.LINE_AA)
                 elif class_id == 74:  # 香烟
                     cigarette_detected = True
                     # 获取边界框坐标
                     x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
                     cigarette_boxes.append([x1, y1, x2, y2, confidence, class_id])
+                    # 绘制香烟检测框
+                    cv2.rectangle(image, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
+                    cv2.putText(image, f'Cigarette: {confidence:.2f}', (int(x1), int(y1)-10),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2, lineType=cv2.LINE_AA)
 
     # 检测吸烟的嘴部特征（方案B）
     smoking_mouth_detected = False
@@ -107,12 +137,33 @@ def infer(args):
         cv2.imwrite('images/test_inferred.jpg', image)
     
     if video_path or cam_id is not None:
-        cap = cv2.VideoCapture(video_path) if video_path else cv2.VideoCapture(cam_id)
-        
+        cap = cv2.VideoCapture(video_path) if video_path else cv2.VideoCapture(cam_id, cv2.CAP_DSHOW)
+
         if cam_id is not None:
-            cap.set(3, conf.FRAME_W)
-            cap.set(4, conf.FRAME_H)
-        
+            # 配置摄像头参数 - 使用更兼容的方式
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)  # 降低分辨率提高稳定性
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            cap.set(cv2.CAP_PROP_FPS, 30)
+            
+            # 检查摄像头是否成功打开
+            if not cap.isOpened():
+                print(f"Error: Could not open camera {cam_id}")
+                return
+            
+            # 等待摄像头预热
+            import time
+            time.sleep(1.0)
+            
+            # 尝试读取几帧来初始化摄像头
+            for i in range(10):
+                ret, frame = cap.read()
+                if ret:
+                    print(f"Camera successfully initialized after {i+1} frames")
+                    break
+                time.sleep(0.1)
+            else:
+                print("Warning: Failed to read initial frames from camera")
+
         frame_width = int(cap.get(3))
         frame_height = int(cap.get(4))
         fps = cap.get(cv2.CAP_PROP_FPS)
@@ -120,7 +171,7 @@ def infer(args):
         if save:
             out = cv2.VideoWriter('videos/output.avi',cv2.VideoWriter_fourcc('M','J','P','G'),
                 fps, (frame_width,frame_height))
-        
+
         while True:
             success, image = cap.read()
             if not success:
@@ -129,16 +180,16 @@ def infer(args):
             image = infer_one_frame(image, model, yolo_model, facial_tracker)
             if save:
                 out.write(image)
-            else:
-                cv2.imshow('DMS', image)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
+
+            cv2.imshow('DMS', image)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
             
         cap.release()
         if save:
             out.release()
         cv2.destroyAllWindows()
-    
+
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
