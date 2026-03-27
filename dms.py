@@ -53,9 +53,11 @@ def infer_one_frame(image, model, yolo_model, facial_tracker, frame_timestamp=No
                 closed_duration = current_time - fatigue_tracker['eye_close_start']
                 if closed_duration >= FATIGUE_CONFIG['eye_closed_duration']:
                     actions.append('fatigue')  # 添加疲劳行为
-                    # 在画面上显示疲劳警告
-                    cv2.putText(image, f'Fatigue: {closed_duration:.1f}s', (30, 150),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, lineType=cv2.LINE_AA)
+                    # 在画面上显示疲劳警告 - 高科技风格
+                    cv2.putText(image, f'WARNING: FATIGUE DETECTED', (30, 150),
+                               cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 3, lineType=cv2.LINE_AA)
+                    cv2.putText(image, f'Duration: {closed_duration:.1f}s', (30, 190),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2, lineType=cv2.LINE_AA)
         else:
             # 眼睛睁开，重置计时器
             if fatigue_tracker['eye_close_start'] is not None:
@@ -79,7 +81,9 @@ def infer_one_frame(image, model, yolo_model, facial_tracker, frame_timestamp=No
             else:
                 # 正在打哈欠中
                 yawn_duration = current_time - fatigue_tracker['yawn_start_time']
-                cv2.putText(image, f'Yawning: {yawn_duration:.1f}s', (30, 180),
+                cv2.putText(image, f'YAWNING DETECTED', (30, 230),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 255), 3, lineType=cv2.LINE_AA)
+                cv2.putText(image, f'Duration: {yawn_duration:.1f}s', (30, 270),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2, lineType=cv2.LINE_AA)
         else:
             # 没有打哈欠
@@ -89,8 +93,8 @@ def infer_one_frame(image, model, yolo_model, facial_tracker, frame_timestamp=No
         if fatigue_tracker['yawn_count'] >= FATIGUE_CONFIG['yawn_frequency']:
             if 'fatigue' not in actions:
                 actions.append('fatigue')
-            cv2.putText(image, f'Yawn count: {fatigue_tracker["yawn_count"]}', (30, 210),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2, lineType=cv2.LINE_AA)
+            cv2.putText(image, f'ALERT: YAWN COUNT = {fatigue_tracker["yawn_count"]}', (30, 310),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 3, lineType=cv2.LINE_AA)
 
     rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     # YOLOv8 推理，只检测手机 (67) 和香烟 (74)
@@ -143,9 +147,9 @@ def infer_one_frame(image, model, yolo_model, facial_tracker, frame_timestamp=No
         # 如果持续时间不足 2 秒，暂时不判定为玩手机（但继续显示检测框）
         else:
             elapsed = current_time - phone_detection_start_time
-            # 在画面上显示倒计时提示
-            cv2.putText(image, f'Phone detect: {elapsed:.1f}s/{PHONE_DETECTION_THRESHOLD}s', 
-                       (30, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2, lineType=cv2.LINE_AA)
+            # 在画面上显示倒计时提示 - 高科技风格
+            cv2.putText(image, f'DETECTING PHONE... {elapsed:.1f}s', 
+                       (30, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2, lineType=cv2.LINE_AA)
             # 暂时不判定为玩手机（用于后续的行为识别）
             phone_for_action = False
     else:
@@ -190,8 +194,10 @@ def infer_one_frame(image, model, yolo_model, facial_tracker, frame_timestamp=No
     if smoking_detected:
         actions.append(list(ACTIONS.keys())[2])  # 添加吸烟行为
 
-    cv2.putText(image, f'Driver eyes: {eyes_status}', (30,40), 0, 1,conf.LM_COLOR, 2, lineType=cv2.LINE_AA)
-    cv2.putText(image, f'Driver action: {", ".join(actions)}', (30,80), 0, 1, conf.CT_COLOR, 2, lineType=cv2.LINE_AA)
+    cv2.putText(image, f'EYES STATUS: {eyes_status.upper()}', (30,40), 0, 1.2, (0, 255, 0), 3, lineType=cv2.LINE_AA)
+    action_text = ', '.join(actions).upper() if actions else 'SAFE DRIVING'
+    action_color = (0, 0, 255) if actions else (0, 255, 0)
+    cv2.putText(image, f'ACTION: {action_text}', (30,80), 0, 1.2, action_color, 3, lineType=cv2.LINE_AA)
     
     return image
 
